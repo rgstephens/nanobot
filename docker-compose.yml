@@ -1,18 +1,11 @@
-x-common-config: &common-config
-  build:
-    context: .
-    dockerfile: Dockerfile
-  volumes:
-    - ~/.nanobot:/root/.nanobot
-
 services:
   nanobot-gateway:
+    image: registry.gstephens.org/nanobot:latest
     container_name: nanobot-gateway
-    <<: *common-config
     command: ["gateway"]
     restart: unless-stopped
-    ports:
-      - 18790:18790
+    volumes:
+      - ./.nanobot:/root/.nanobot
     deploy:
       resources:
         limits:
@@ -21,11 +14,18 @@ services:
         reservations:
           cpus: '0.25'
           memory: 256M
-  
+
   nanobot-cli:
-    <<: *common-config
+    image: registry.gstephens.org/nanobot:latest
+    container_name: nanobot-cli
     profiles:
       - cli
-    command: ["status"]
+    volumes:
+      - ./.nanobot:/root/.nanobot
     stdin_open: true
     tty: true
+
+networks:
+  default:
+    external: true
+    name: app-network
