@@ -3,6 +3,9 @@
 Features:
 
 - Web search
+- Snooker tour skill
+  - Basic skill working
+  - Rewrite python in golang?
 - Reminders system & Timers
   - Notify me via SMS, iOS/watch
 - Ask about my bands playing in cities on dates (Spotify API or access my local list of artists)
