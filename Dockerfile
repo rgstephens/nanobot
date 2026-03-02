@@ -21,6 +21,7 @@ RUN mkdir -p nanobot bridge && touch nanobot/__init__.py && \
     rm -rf nanobot bridge
 
 # Copy the full source and install
+COPY VERSION ./
 COPY nanobot/ nanobot/
 COPY bridge/ bridge/
 RUN uv pip install --system --no-cache .

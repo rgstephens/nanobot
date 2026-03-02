@@ -1,6 +1,7 @@
-REGISTRY   := registry.gstephens.org
+-include .env
+REGISTRY   ?= $(error REGISTRY is not set. Add REGISTRY=your.registry.host to .env)
 IMAGE      := $(REGISTRY)/nanobot
-VERSION    := $(shell grep '^version' pyproject.toml | head -1 | sed 's/.*= *"//' | sed 's/"//')
+VERSION    := $(shell cat VERSION)
 BUILD_DATE := $(shell date -u +"%Y-%m-%d")
 PLATFORMS  := linux/amd64,linux/arm64
 BUILDER    := multiarch
@@ -44,3 +45,4 @@ docker-push-all: docker-setup
 
 docker-release: docker-push-all
 	@echo "Released $(IMAGE):$(VERSION)"
+	crane ls $(REGISTRY)/nanobot

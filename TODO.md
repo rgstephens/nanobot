@@ -2,7 +2,10 @@
 
 Features:
 
+- LangFuse Integration
+- Model testing setup
 - Web search
+- Version skill
 - Snooker tour skill
   - Basic skill working
   - Rewrite python in golang?
@@ -24,6 +27,7 @@ Features:
   - ToDo, Project Ideas, Favorite artists, sports teams, snooker players
   - Artists (Daily download of favorite artists from spotify)
   - Use a google sheets for storage a separate sheet for each list (or daily backup to google sheets)
+  - Trello integration
 
 ## Agents
 
@@ -31,3 +35,5 @@ Features:
 - BMW climate control
 - Tesla climate control
 - Reminders (pay taxes on, call)
+
+## Done

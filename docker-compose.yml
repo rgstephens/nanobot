@@ -1,6 +1,6 @@
 services:
   nanobot-gateway:
-    image: registry.gstephens.org/nanobot:latest
+    image: ${REGISTRY}/nanobot:latest
     container_name: nanobot-gateway
     command: ["gateway"]
     restart: unless-stopped
@@ -16,7 +16,7 @@ services:
           memory: 256M
 
   nanobot-cli:
-    image: registry.gstephens.org/nanobot:latest
+    image: ${REGISTRY}/nanobot:latest
     container_name: nanobot-cli
     profiles:
       - cli
