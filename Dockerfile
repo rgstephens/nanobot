@@ -2,7 +2,7 @@ FROM ghcr.io/astral-sh/uv:python3.12-bookworm-slim
 
 # Install Node.js 20 for the WhatsApp bridge
 RUN apt-get update && \
-    apt-get install -y --no-install-recommends curl ca-certificates gnupg git && \
+    apt-get install -y --no-install-recommends curl ca-certificates gnupg git jq && \
     mkdir -p /etc/apt/keyrings && \
     curl -fsSL https://deb.nodesource.com/gpgkey/nodesource-repo.gpg.key | gpg --dearmor -o /etc/apt/keyrings/nodesource.gpg && \
     echo "deb [signed-by=/etc/apt/keyrings/nodesource.gpg] https://deb.nodesource.com/node_20.x nodistro main" > /etc/apt/sources.list.d/nodesource.list && \
@@ -30,6 +30,19 @@ RUN uv pip install --system --no-cache .
 WORKDIR /app/bridge
 RUN npm install && npm run build
 WORKDIR /app
+
+# Install gogcli (Google Workspace CLI) for the gog skill
+RUN arch=$(uname -m) && \
+    if [ "$arch" = "x86_64" ]; then ARCH=amd64; else ARCH=arm64; fi && \
+    curl -fsSL "https://github.com/steipete/gogcli/releases/download/v0.11.0/gogcli_0.11.0_linux_${ARCH}.tar.gz" \
+        -o /tmp/gogcli.tar.gz && \
+    tar -xzf /tmp/gogcli.tar.gz -C /tmp && \
+    mv /tmp/gog /usr/local/bin/gog && \
+    chmod +x /usr/local/bin/gog && \
+    rm /tmp/gogcli.tar.gz
+
+# Install fargo CLI for the fargorate skill
+RUN curl -fsSL https://raw.githubusercontent.com/rgstephens/fargo-skill/main/install.sh | bash
 
 # Create config directory
 RUN mkdir -p /root/.nanobot

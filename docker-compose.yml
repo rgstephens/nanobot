@@ -6,6 +6,13 @@ services:
     restart: unless-stopped
     volumes:
       - ./.nanobot:/root/.nanobot
+      - ./.gogcli:/root/.config/gogcli
+    environment:
+      - LANGFUSE_BASE_URL=${LANGFUSE_BASE_URL:-}
+      - LANGFUSE_PUBLIC_KEY=${LANGFUSE_PUBLIC_KEY:-}
+      - LANGFUSE_SECRET_KEY=${LANGFUSE_SECRET_KEY:-}
+      - GOG_KEYRING_PASSWORD=${GOG_KEYRING_PASSWORD:-}
+      - GOG_ACCOUNT=${GOG_ACCOUNT:-}
     deploy:
       resources:
         limits:
@@ -22,6 +29,7 @@ services:
       - cli
     volumes:
       - ./.nanobot:/root/.nanobot
+      - ./.gogcli:/root/.config/gogcli
     stdin_open: true
     tty: true
 

@@ -22,12 +22,12 @@ import urllib.request
 from datetime import date, timedelta
 from pathlib import Path
 
-BASE_URL = "http://api.snooker.org/"
+BASE_URL = "https://api.snooker.org/"
 WORKSPACE = Path.home() / ".nanobot/workspace"
 SNOOKER_DIR = WORKSPACE / "snooker"
 CONFIG_FILE = SNOOKER_DIR / "config.json"
 
-TOUR = 1  # Main tour
+TOUR = "main"  # Main tour
 
 
 def load_config() -> dict:
@@ -42,13 +42,15 @@ def api_get(params: str) -> list | dict:
     config = load_config()
     url = f"{BASE_URL}?{params}"
     req = urllib.request.Request(url, headers={"X-Requested-By": config["apiKey"]})
+    print(f"Fetching: {url}")
     with urllib.request.urlopen(req, timeout=10) as resp:
         return json.loads(resp.read())
 
 
 def current_season() -> int:
     data = api_get("t=20")
-    return data[0]["Season"] if isinstance(data, list) else data["Season"]
+    record = data[0] if isinstance(data, list) else data
+    return record.get("CurrentSeason") or record.get("Season")
 
 
 def all_players(season: int) -> list[dict]:
@@ -66,6 +68,39 @@ def find_players(name: str) -> list[dict]:
 
 def format_name(p: dict) -> str:
     return f"{p.get('FirstName', '')} {p.get('LastName', '')}".strip()
+
+
+def player_map(season: int) -> dict[int, str]:
+    """Return {playerID: "First Last"} for the given season."""
+    return {p["ID"]: format_name(p) for p in all_players(season) if "ID" in p}
+
+
+def event_map(season: int) -> dict[int, str]:
+    """Return {eventID: "Event Name"} for the given season."""
+    events = api_get(f"t=5&s={season}&tr={TOUR}")
+    return {e["ID"]: e.get("Name", str(e["ID"])) for e in events if "ID" in e}
+
+
+def match_time(m: dict) -> str:
+    """Extract scheduled time as 'YYYY-MM-DD HH:MM UTC' (or date-only if no time)."""
+    raw = m.get("ScheduledDate") or m.get("StartDate") or ""
+    if not raw:
+        return ""
+    # Format: 2026-03-17T02:00:00Z → "2026-03-17 02:00 UTC"
+    if "T" in raw:
+        date_part, time_part = raw[:10], raw[11:16]
+        return f"{date_part} {time_part} UTC"
+    return raw[:10]
+
+
+def format_match(m: dict, players: dict[int, str], events: dict[int, str]) -> str:
+    p1 = players.get(m.get("Player1ID", 0), "TBD")
+    p2 = players.get(m.get("Player2ID", 0), "TBD")
+    s1 = m.get("Score1", "?")
+    s2 = m.get("Score2", "?")
+    event = events.get(m.get("EventID", 0), f"ID:{m.get('EventID', '?')}")
+    round_ = m.get("Round", "")
+    return f"  {p1} {s1} – {s2} {p2}  ({event}, Rd {round_})" if round_ else f"  {p1} {s1} – {s2} {p2}  ({event})"
 
 
 # --- commands ---
@@ -87,7 +122,8 @@ def cmd_setup(args: list[str]) -> None:
 
     # Quick test
     data = api_get("t=20")
-    season = data[0]["Season"] if isinstance(data, list) else data["Season"]
+    record = data[0] if isinstance(data, list) else data
+    season = record.get("CurrentSeason") or record.get("Season")
     print(f"API working — current season: {season}")
 
 
@@ -149,15 +185,13 @@ def cmd_results(args: list[str]) -> None:
         print(f"No results in the last {days} day(s).")
         return
 
+    season = current_season()
+    players = player_map(season)
+    events = event_map(season)
+
     print(f"Results — last {days} day(s):\n")
     for m in data:
-        p1 = m.get("Player1Name", "?")
-        p2 = m.get("Player2Name", "?")
-        s1 = m.get("Score1", "?")
-        s2 = m.get("Score2", "?")
-        event = m.get("EventName", "")
-        round_ = m.get("RoundName", "")
-        print(f"  {p1} {s1} – {s2} {p2}  ({event}, {round_})")
+        print(format_match(m, players, events))
 
 
 def cmd_live(_args: list[str]) -> None:
@@ -166,14 +200,13 @@ def cmd_live(_args: list[str]) -> None:
         print("No matches in progress.")
         return
 
+    season = current_season()
+    players = player_map(season)
+    events = event_map(season)
+
     print("Live matches:\n")
     for m in data:
-        p1 = m.get("Player1Name", "?")
-        p2 = m.get("Player2Name", "?")
-        s1 = m.get("Score1", "?")
-        s2 = m.get("Score2", "?")
-        event = m.get("EventName", "")
-        print(f"  {p1} {s1} – {s2} {p2}  ({event})")
+        print(format_match(m, players, events))
 
 
 def parse_date_arg(args: list[str]) -> date:
@@ -186,11 +219,18 @@ def parse_date_arg(args: list[str]) -> date:
 
 def match_date(m: dict) -> str:
     """Extract date string (YYYY-MM-DD) from a match record."""
-    raw = m.get("ScheduledTime") or m.get("InitialisedTime") or ""
+    raw = m.get("ScheduledDate") or m.get("StartDate") or ""
     return raw[:10] if raw else ""
 
 
 def cmd_upcoming(args: list[str]) -> None:
+    # Optional --player filter
+    player_name = None
+    if "--player" in args:
+        idx = args.index("--player")
+        player_name = args[idx + 1]
+        args = args[:idx] + args[idx + 2:]
+
     target = parse_date_arg(args)
     target_str = target.isoformat()
     data = api_get(f"t=14&tr={TOUR}")
@@ -198,20 +238,30 @@ def cmd_upcoming(args: list[str]) -> None:
         print("No upcoming matches scheduled.")
         return
 
-    matches = [m for m in data if match_date(m) == target_str]
-    label = "tomorrow" if target == date.today() + timedelta(days=1) else target_str
-    if not matches:
-        print(f"No matches scheduled for {label}.")
-        return
+    season = current_season()
+    players = player_map(season)
+    events = event_map(season)
 
-    print(f"Matches scheduled for {label} ({target_str}):\n")
-    for m in matches:
-        p1 = m.get("Player1Name", "?")
-        p2 = m.get("Player2Name", "?")
-        event = m.get("EventName", "")
-        round_ = m.get("RoundName", "")
-        time_ = match_date(m)
-        print(f"  {time_}  {p1} vs {p2}  ({event}, {round_})")
+    # Resolve player filter to an ID
+    player_id = None
+    if player_name:
+        found = find_players(player_name)
+        if not found:
+            print(f"Player not found: {player_name}")
+            return
+        player_id = found[0]["ID"]
+        print(f"Upcoming matches for {format_name(found[0])}:\n")
+    else:
+        label = "tomorrow" if target == date.today() + timedelta(days=1) else target_str
+        print(f"Matches scheduled for {label} ({target_str}):\n")
+
+    for m in data:
+        if player_id:
+            if m.get("Player1ID") != player_id and m.get("Player2ID") != player_id:
+                continue
+        elif match_date(m) != target_str:
+            continue
+        print(f"  {match_time(m)}  {format_match(m, players, events).strip()}")
 
 
 def cmd_tournaments(args: list[str]) -> None:
@@ -291,15 +341,64 @@ def cmd_h2h(args: list[str]) -> None:
         print(f"  {date}  {format_name(p1)} {s1} – {s2} {format_name(p2)}  ({event}, {round_})")
 
 
+def cmd_player_id(args: list[str]) -> None:
+    if not args:
+        print("Usage: snooker.py player-id <id>")
+        sys.exit(1)
+    pid = args[0]
+    profile = api_get(f"p={pid}")
+    if isinstance(profile, list):
+        if not profile:
+            print(f"No player found with ID {pid}.")
+            return
+        profile = profile[0]
+
+    print(f"\n{format_name(profile)}")
+    print(f"  ID          : {profile.get('ID', 'N/A')}")
+    print(f"  Nationality : {profile.get('Nationality', 'N/A')}")
+    print(f"  Born        : {profile.get('Born', 'N/A')}")
+    print(f"  First Pro   : {profile.get('FirstSeasonAsPro', 'N/A')}")
+    print(f"  Ranking titles: {profile.get('NumRankingTitles', 'N/A')}")
+    print(f"  Max breaks  : {profile.get('NumMaximums', 'N/A')}")
+
+
+def cmd_event(args: list[str]) -> None:
+    if not args:
+        print("Usage: snooker.py event <id>")
+        sys.exit(1)
+    eid = args[0]
+    data = api_get(f"e={eid}")
+    if isinstance(data, list):
+        if not data:
+            print(f"No event found with ID {eid}.")
+            return
+        data = data[0]
+
+    name = data.get("Name", "Unknown")
+    sponsor = data.get("Sponsor", "")
+    full_name = f"{sponsor} {name}".strip() if sponsor else name
+    print(f"\n{full_name}")
+    print(f"  ID       : {data.get('ID', 'N/A')}")
+    print(f"  Type     : {data.get('Type', 'N/A')}")
+    print(f"  Dates    : {data.get('StartDate', '')} – {data.get('EndDate', '')}")
+    venue = ", ".join(filter(None, [data.get("Venue", ""), data.get("City", ""), data.get("Country", "")]))
+    if venue:
+        print(f"  Venue    : {venue}")
+    print(f"  Season   : {data.get('Season', 'N/A')}")
+    print(f"  Entries  : {data.get('NumCompetitors', 'N/A')}")
+
+
 COMMANDS = {
     "setup": cmd_setup,
     "rankings": cmd_rankings,
     "player": cmd_player,
+    "player-id": cmd_player_id,
     "results": cmd_results,
     "live": cmd_live,
     "upcoming": cmd_upcoming,
     "tournaments": cmd_tournaments,
     "schedule": cmd_schedule,
+    "event": cmd_event,
     "h2h": cmd_h2h,
 }
 
@@ -310,11 +409,13 @@ def usage() -> None:
     print("  setup --api-key KEY               Save your X-Requested-By API key")
     print("  rankings [--season N]             World rankings (current season by default)")
     print("  player <name>                     Search for a player by name")
+    print("  player-id <id>                    Player profile by numeric ID")
     print("  results [--days N]                Recent results (default: 1 day)")
     print("  live                              Ongoing matches")
     print("  upcoming [--date YYYY-MM-DD]      Matches on a date (default: tomorrow)")
     print("  tournaments [--date YYYY-MM-DD]   Tournaments active on a date (default: tomorrow)")
     print("  schedule [--date YYYY-MM-DD]      Matches + tournaments for a date (default: tomorrow)")
+    print("  event <id>                        Event details by numeric ID")
     print("  h2h <name1> <name2>               Head-to-head between two players")
 
 

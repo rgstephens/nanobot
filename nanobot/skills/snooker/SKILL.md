@@ -26,9 +26,15 @@ Query live snooker data — rankings, results, player profiles, and more.
 {baseDir}/scripts/snooker.py player "O'Sullivan"
 {baseDir}/scripts/snooker.py player "Ronnie"
 
-# Recent results
+# Player profile by numeric ID (faster — use when you already have the ID)
+{baseDir}/scripts/snooker.py player-id 16
+
+# Recent results (returns Player1ID, Player2ID, EventID — use player-id/event to resolve names)
 {baseDir}/scripts/snooker.py results
 {baseDir}/scripts/snooker.py results --days 3
+
+# Event details by numeric ID
+{baseDir}/scripts/snooker.py event 2205
 
 # Live matches in progress
 {baseDir}/scripts/snooker.py live
@@ -36,6 +42,10 @@ Query live snooker data — rankings, results, player profiles, and more.
 # Matches scheduled for tomorrow (default) or a specific date
 {baseDir}/scripts/snooker.py upcoming
 {baseDir}/scripts/snooker.py upcoming --date 2026-03-15
+
+# Upcoming matches for a specific player (all future matches, not just tomorrow)
+{baseDir}/scripts/snooker.py upcoming --player "Hawkins"
+{baseDir}/scripts/snooker.py upcoming --player "Ronnie O'Sullivan"
 
 # Tournaments active tomorrow (default) or a specific date
 {baseDir}/scripts/snooker.py tournaments
@@ -62,7 +72,7 @@ Config is stored at `~/.nanobot/workspace/snooker/config.json` (in the Docker vo
 
 ## Notes
 
-- All data is from the main professional tour (tour ID 1)
+- All data is from the main professional tour (tour ID main)
 - Rankings show top 20 by prize money for the current season
 - `player` returns up to 3 matching results if the name is ambiguous
 - `h2h` searches by last name or full name — be specific if names are ambiguous

@@ -1,6 +1,6 @@
 ---
 name: version
-description: Report the NanoBot base version and deployment version.
+description: Report the NanoBot base version, deployment version and the model from the config.json
 ---
 
 # Version

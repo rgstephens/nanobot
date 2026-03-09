@@ -135,6 +135,20 @@ List files are plain markdown — you can view or edit them directly on the serv
 
 ---
 
+### Google gog skill
+
+Auth with google on Mac and **save creds to file**
+
+```sh
+# On Dev Mac
+GOG_KEYRING_BACKEND=file GOG_KEYRING_PASSWORD=xxx gog auth add nworksgreg@gmail.com --services docs,drive,gmail,sheets
+scp ~/Library/Application\ Support/gogcli/keyring/* 10.2.2.6:/tmp/gogcli-keyring/
+# On prod server
+sudo cp /tmp/gogcli-keyring/* ~/Docker/nanobot/.gogcli/keyring/
+docker compose restart
+docker exec nanobot-gateway gog auth list
+```
+
 ### Spotify skill (`nanobot/skills/spotify/`)
 
 Queries the Spotify API for followed artists and new releases.
