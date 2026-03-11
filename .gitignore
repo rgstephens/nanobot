@@ -22,3 +22,4 @@ botpy.log
 tests/
 .history/
 node_modules/
+archive/
